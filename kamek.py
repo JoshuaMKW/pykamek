@@ -3,6 +3,9 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 
+from dolreader.dol import DolFile
+from dolreader.section import TextSection
+
 from exceptions import InvalidCommandException, InvalidOperationException
 from ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
                       read_uint16, read_uint32, write_sbyte, write_sint16,
@@ -182,3 +185,19 @@ class KamekBinary(object):
 
         _packedBinary.seek(0)
         return _packedBinary
+
+    def pack_riivo(self) -> str:
+        pass
+
+    def pack_gecko_codes(self) -> str:
+        pass
+
+    def apply_to_dol(self, dol: DolFile):
+        if self.baseAddr.type == KWord.Types.RELATIVE:
+            raise InvalidOperationException("Cannot pack a dynamically linked binary into a DOL")
+
+        dol.append_section(TextSection(self.baseAddr.value, self.rawCode))
+
+        for _key in self.commands:
+            self.commands[_key].apply_to_dol(dol)
+

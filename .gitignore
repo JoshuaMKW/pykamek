@@ -140,3 +140,12 @@ tmp-*
 
 # kamek
 Kamek.exe
+
+# dol
+*.dol
+
+# gecko
+*.gct
+
+# xml
+*.xml

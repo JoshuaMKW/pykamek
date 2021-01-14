@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 import re
 
+from io import BytesIO
 from pathlib import Path
 from typing import List
+
+from dolreader.dol import DolFile
 
 from addressmapper import AddressMapper
 from exceptions import InvalidDataException
@@ -79,9 +82,14 @@ def main():
     parser.add_argument("elf", help="ELF object file(s) and or folders of ELF object files", nargs="+")
     parser.add_argument("--dynamic", help="The module is dynamically relocated", action="store_true")
     parser.add_argument("--static", help="The module is statically located at ADDR", metavar="ADDR")
+    parser.add_argument("--output-kamek", help="File to output Kamek Binary", metavar="FILE")
+    parser.add_argument("--output-riiv", help="File to output riivolution XML", metavar="FILE")
+    parser.add_argument("--output-gecko", help="File to output gecko code", metavar="FILE")
+    parser.add_argument("--output-code", help="File to output raw code", metavar="FILE")
+    parser.add_argument("--input-dol", help="Input DOL file", metavar="FILE")
+    parser.add_argument("--output-dol", help="File to output patched DOL", metavar="FILE")
     parser.add_argument("--extern", help="External linker map", metavar="FILE")
     parser.add_argument("--versionmap", help="Version map for address translations", metavar="FILE")
-    parser.add_argument("-d", "--dest", help="Destination path", metavar="FILE")
 
     args = parser.parse_args()
 
@@ -107,10 +115,36 @@ def main():
     else:
         _versionMap = VersionMapper()
 
-    if args.dest:
-        _dest = Path(args.dest).resolve()
-    else:
-        _dest = Path("build-$KV$.kmk").resolve()
+    _outputKamekPath = None
+    _outputRiivPath = None
+    _outputGeckoPath = None
+    _outputCodePath = None
+    _inputDolPath = None
+    _outputDolPath = None
+
+    if args.output_kamek:
+        _outputKamekPath = Path(args.output_kamek).resolve()
+    if args.output_riiv:
+        _outputRiivPath = Path(args.output_riiv).resolve()
+    if args.output_gecko:
+        _outputGeckoPath = Path(args.output_gecko).resolve()
+    if args.output_code:
+        _outputCodePath = Path(args.output_code).resolve()
+    if args.input_dol:
+        _inputDolPath = Path(args.input_dol).resolve()
+    if args.output_dol:
+        _outputDolPath = Path(args.output_dol).resolve()
+
+    if (_outputKamekPath is None and
+        _outputRiivPath is None and
+        _outputGeckoPath is None and
+        _outputCodePath is None and
+        _outputDolPath is None
+        ):
+        parser.error("No output path(s) specified")
+
+    if _inputDolPath is None and _outputDolPath:
+        parser.error("Input DOL path not specified")
 
     for versionKey in _versionMap.mappers:
         print(f"Linking version {versionKey}")
@@ -124,8 +158,27 @@ def main():
 
         kb = KamekBinary()
         kb.load_from_linker(elfConverter)
-        with open(str(_dest).replace("$KV$", versionKey), "wb") as kBinary:
-            kBinary.write(KamekBinary.pack_from(elfConverter).getvalue())
+        if _outputKamekPath:
+            with open(str(_outputKamekPath).replace("$KV$", versionKey), "wb") as kBinary:
+                kBinary.write(kb.pack().getvalue())
+        if _outputRiivPath:
+            with open(str(_outputRiivPath).replace("$KV$", versionKey), "w") as kBinary:
+                kBinary.write(kb.pack_riivo())
+        if _outputGeckoPath:
+            with open(str(_outputGeckoPath).replace("$KV$", versionKey), "w") as kBinary:
+                kBinary.write(kb.pack_gecko_codes())
+        if _outputCodePath:
+            with open(str(_outputCodePath).replace("$KV$", versionKey), "wb") as kBinary:
+                kBinary.write(kb.rawCode.getvalue())
+
+        if _outputDolPath:
+            dol = DolFile(BytesIO(_inputDolPath.read_bytes()))
+            kb.apply_to_dol(dol)
+
+            outPath = str(_outputDolPath).replace("$KV$", versionKey)
+
+            with open(outPath, "wb") as outDol:
+                dol.save(outDol)
 
     print("Finished execution")
 

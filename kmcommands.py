@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from io import BytesIO
 
+from dolreader.dol import DolFile
+
 from elfenums import ELFFlags
 from exceptions import InvalidOperationException
-from ioreader import write_uint32, write_uint16
+from ioreader import (read_ubyte, read_uint16, read_uint32, write_ubyte,
+                      write_uint16, write_uint32)
 from kmword import KWord
+
 
 class Command(object):
     class KCmdID:
@@ -70,8 +74,12 @@ class BranchCommand(Command):
     def pack_gecko_codes(self) -> list:
         raise NotImplementedError()
 
-    def apply_to_dol(self):
-        raise NotImplementedError()
+    def apply_to_dol(self, dol: DolFile):
+        self.address.assert_absolute()
+        self.target.assert_absolute()
+
+        dol.seek(self.address.value)
+        write_uint32(dol, self._generate_instruction())
 
     def _generate_instruction(self) -> int:
         delta = self.target - self.address
@@ -130,6 +138,9 @@ class PatchExitCommand(Command):
             return False
 
     def pack_riivo(self) -> str:
+        raise NotImplementedError()
+
+    def pack_gecko_codes(self) -> list:
         raise NotImplementedError()
 
     def apply_to_dol(self):
@@ -202,13 +213,98 @@ class WriteCommand(Command):
         return False
 
     def pack_riivo(self) -> str:
-        raise NotImplementedError()
+        self.address.assert_absolute()
+        if self.valueType == WriteCommand.Type.Pointer:
+            self.value.assert_absolute()
+        else:
+            self.value.assert_value()
 
+        if self.original is not None:
+            self.original.assert_not_relative()
+
+            if self.valueType == WriteCommand.Type.Value8:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X2}' original='{self.original:X2}' />"
+            elif self.valueType == WriteCommand.Type.Value16:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X4}' original='{self.original:X4}' />"
+            elif self.valueType == WriteCommand.Type.Value32:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X8}' original='{self.original:X8}' />"
+            elif self.valueType == WriteCommand.Type.Pointer:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X8}' original='{self.original:X8}' />"
+
+        else:
+            if self.valueType == WriteCommand.Type.Value8:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X2}' />"
+            elif self.valueType == WriteCommand.Type.Value16:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X4}' />"
+            elif self.valueType == WriteCommand.Type.Value32:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X8}' />"
+            elif self.valueType == WriteCommand.Type.Pointer:
+                return f"<memory offset='0x{self.address:X8}' value='{self.value:X8}' />"
+
+        raise InvalidOperationException(f"Invalid command type {self.valueType} specified")
+    
     def pack_gecko_codes(self) -> list:
-        raise NotImplementedError()
+        self.address.assert_absolute()
+        if self.valueType == WriteCommand.Type.Pointer:
+            self.value.assert_absolute()
+        else:
+            self.value.assert_value()
 
-    def apply_to_dol(self):
-        raise NotImplementedError()
+        if self.original is not None:
+            raise NotImplementedError("Conditional writes not yet supported for gecko")
+        elif self.address >= 0x90000000:
+            raise NotImplementedError("MEM2 writes not yet supported for gecko")
+
+        code = ((self.address & 0x1FFFFFF) << 32) | self.value
+
+        if self.valueType == WriteCommand.Type.Value16:
+            return list(code | (0x2000000 << 32))
+        elif self.valueType == WriteCommand.Type.Value32:
+            return list(code | (0x4000000 << 32))
+        elif self.valueType == WriteCommand.Type.Pointer:
+            return list(code | (0x4000000 << 32))
+
+        raise InvalidOperationException(f"Invalid command type {self.valueType} specified")
+
+    def apply_to_dol(self, dol: DolFile):
+        self.address.assert_absolute()
+        if self.valueType == WriteCommand.Type.Pointer:
+            self.value.assert_absolute()
+        else:
+            self.value.assert_value()
+
+        if self.original is not None:
+            shouldPatch = False
+
+            if self.valueType == WriteCommand.Type.Value8:
+                dol.seek(self.address.value)
+                shouldPatch = self.original == read_ubyte(dol)
+            elif self.valueType == WriteCommand.Type.Value16:
+                dol.seek(self.address.value)
+                shouldPatch = self.original == read_uint16(dol)
+            elif self.valueType == WriteCommand.Type.Value32:
+                dol.seek(self.address.value)
+                shouldPatch = self.original == read_uint32(dol)
+            elif self.valueType == WriteCommand.Type.Pointer:
+                dol.seek(self.address.value)
+                shouldPatch = self.original == read_uint32(dol)
+            
+            if not shouldPatch:
+                return
+
+        if self.valueType == WriteCommand.Type.Value8:
+            dol.seek(self.address.value)
+            write_ubyte(dol, self.value.value)
+        elif self.valueType == WriteCommand.Type.Value16:
+            dol.seek(self.address.value)
+            write_uint16(dol, self.value.value)
+        elif self.valueType == WriteCommand.Type.Value32:
+            dol.seek(self.address.value)
+            write_uint32(dol, self.value.value)
+        elif self.valueType == WriteCommand.Type.Pointer:
+            dol.seek(self.address.value)
+            write_uint32(dol, self.value.value)
+
 
 class RelocCommand(Command):
     def __init__(self, source: KWord, target: KWord, reloc: ELFFlags.Reloc):
@@ -237,10 +333,10 @@ class RelocCommand(Command):
     def apply(self, f: "KamekBinary") -> bool:
         if self.id == Command.KCmdID.Rel24:
             if self.is_equal_reloc_types() and not self.target.is_value():
-                delta = self.target.value - self.address.value
+                delta = self.target - self.address
 
-                insn = (f.read_u32(self.address.value) & 0xFC000003) | (delta & 0x3FFFFFC)
-                f.write_u32(self.address.value, insn)
+                insn = (delta & 0x3FFFFFC) | (f.read_u32(self.address.value) & 0xFC000003)
+                f.write_u32(self.address.value, insn.value)
                 return True
  
         elif self.id == Command.KCmdID.Addr32:
@@ -273,5 +369,37 @@ class RelocCommand(Command):
     def pack_riivo(self) -> str:
         raise NotImplementedError()
 
-    def apply_to_dol(self):
+    def pack_gecko_codes(self) -> list:
         raise NotImplementedError()
+
+    def apply_to_dol(self, dol: DolFile):
+        self.address.assert_absolute()
+        self.target.assert_absolute()
+
+        if self.id == Command.KCmdID.Rel24:
+            delta = self.target - self.address
+
+            dol.seek(self.address.value)
+            insn = (delta & 0x3FFFFFC) | (read_uint32(dol) & 0xFC000003)
+            dol.seek(self.address.value)
+            write_uint32(dol, insn.value)
+ 
+        elif self.id == Command.KCmdID.Addr32:
+            dol.seek(self.address.value)
+            write_uint32(dol, self.target.value)
+
+        elif self.id == Command.KCmdID.Addr16Lo:
+            dol.seek(self.address.value)
+            write_uint32(dol, self.target.value & 0xFFFF)
+
+        elif self.id == Command.KCmdID.Addr16Hi:
+            dol.seek(self.address.value)
+            write_uint32(dol, (self.target.value >> 16) & 0xFFFF)
+
+        elif self.id == Command.KCmdID.Addr16Ha:
+            aTarget = ((self.target.value >> 16) + 1) & 0xFFFF if (self.target.value >> 16) & 0x8000 != 0 else (self.target.value >> 16) & 0xFFFF
+            dol.seek(self.address.value)
+            write_uint32(dol, aTarget)
+
+        else:
+            raise NotImplementedError("Unrecognized relocation type")
