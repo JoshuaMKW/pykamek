@@ -6,14 +6,14 @@ from pathlib import Path
 from dolreader.dol import DolFile
 from dolreader.section import TextSection
 
-from exceptions import InvalidCommandException, InvalidOperationException
-from ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
+from pykamek.exceptions import InvalidCommandException, InvalidOperationException
+from pykamek.ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
                       read_uint16, read_uint32, write_sbyte, write_sint16,
                       write_sint32, write_ubyte, write_uint16, write_uint32)
-from kmcommands import RelocCommand
-from kmhooks import KHook
-from kmword import KWord
-from linker import Linker
+from pykamek.kmcommands import RelocCommand
+from pykamek.kmhooks import KHook
+from pykamek.kmword import KWord
+from pykamek.linker import Linker
 
 
 class KamekBinary(object):

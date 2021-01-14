@@ -1,8 +1,8 @@
 import os
 import re
 
-from exceptions import InvalidDataException
-from addressmapper import AddressMapper
+from pykamek.exceptions import InvalidDataException
+from pykamek.addressmapper import AddressMapper
 
 class VersionMapper(object):
     def __init__(self, path: str = None):

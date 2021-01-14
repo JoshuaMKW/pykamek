@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from exceptions import InvalidOperationException
+from pykamek.exceptions import InvalidOperationException
 
 class KWord(object):
     class Types:

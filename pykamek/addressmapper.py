@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from exceptions import InvalidMappingException
+from pykamek.exceptions import InvalidMappingException
 
 class AddressMapper(object):
 

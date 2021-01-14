@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from addressmapper import AddressMapper
-from exceptions import InvalidDataException
-from kmcommands import BranchCommand, WriteCommand, PatchExitCommand
-from kmword import KWord
+from pykamek.addressmapper import AddressMapper
+from pykamek.exceptions import InvalidDataException
+from pykamek.kmcommands import BranchCommand, WriteCommand, PatchExitCommand
+from pykamek.kmword import KWord
 
 class HookData(object):
     def __init__(self, _type: int, args: list):

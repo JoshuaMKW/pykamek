@@ -8,16 +8,16 @@ from elftools.elf.elffile import (ELFFile, Section, StringTableSection,
                                   SymbolTableIndexSection, SymbolTableSection)
 from elftools.elf.relocation import RelocationSection
 
-from addressmapper import AddressMapper
-from elfenums import ELFFlags
-from exceptions import (AlreadyExistsException, AlreadyLinkedException,
+from pykamek.addressmapper import AddressMapper
+from pykamek.elfenums import ELFFlags
+from pykamek.exceptions import (AlreadyExistsException, AlreadyLinkedException,
                         InvalidDataException, InvalidOperationException,
                         InvalidTableLinkageException)
-from ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
+from pykamek.ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
                       read_uint16, read_uint32, write_sbyte, write_sint16,
                       write_sint32, write_ubyte, write_uint16, write_uint32)
-from kmhooks import HookData
-from kmword import KWord
+from pykamek.kmhooks import HookData
+from pykamek.kmword import KWord
 
 
 class Linker(AddressMapper):

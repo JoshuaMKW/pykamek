@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-import argparse
 import re
 
+from argparse import ArgumentParser
 from io import BytesIO
 from pathlib import Path
 from typing import List
 
 from dolreader.dol import DolFile
 
-from addressmapper import AddressMapper
-from exceptions import InvalidDataException
-from linker import Linker
-from kamek import KamekBinary
-from versionmap import VersionMapper
+from pykamek import __version__
+from pykamek.addressmapper import AddressMapper
+from pykamek.exceptions import InvalidDataException
+from pykamek.linker import Linker
+from pykamek.kamek import KamekBinary
+from pykamek.versionmap import VersionMapper
 
 def sorted_alphanumeric(l): 
     """ Sort the given iterable in the way that humans expect.""" 
@@ -76,8 +77,8 @@ class ElfHandler(Linker):
     def exec_jobs(self):
         pass
 
-def main():
-    parser = argparse.ArgumentParser("elftokuribo", description="ELF to Kuribo module converter")
+def main(args: list):
+    parser = ArgumentParser(f"pykamek {__version__}", description="ELF to Kuribo module converter")
 
     parser.add_argument("elf", help="ELF object file(s) and or folders of ELF object files", nargs="+")
     parser.add_argument("--dynamic", help="The module is dynamically relocated", action="store_true")
@@ -91,7 +92,7 @@ def main():
     parser.add_argument("--extern", help="External linker map", metavar="FILE")
     parser.add_argument("--versionmap", help="Version map for address translations", metavar="FILE")
 
-    args = parser.parse_args()
+    args = parser.parse_args(args)
 
     if args.dynamic and args.static:
         parser.error("Args `--dynamic' and `--static' cannot be used together")
@@ -183,4 +184,4 @@ def main():
     print("Finished execution")
 
 if __name__ == "__main__":
-    main()
+    main(None)

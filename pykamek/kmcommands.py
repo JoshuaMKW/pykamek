@@ -5,11 +5,11 @@ from io import BytesIO
 from dolreader.dol import DolFile
 from dolreader.exceptions import UnmappedAddressError
 
-from elfenums import ELFFlags
-from exceptions import InvalidOperationException
-from ioreader import (read_ubyte, read_uint16, read_uint32, write_ubyte,
+from pykamek.elfenums import ELFFlags
+from pykamek.exceptions import InvalidOperationException
+from pykamek.ioreader import (read_ubyte, read_uint16, read_uint32, write_ubyte,
                       write_uint16, write_uint32)
-from kmword import KWord
+from pykamek.kmword import KWord
 
 
 class Command(object):
