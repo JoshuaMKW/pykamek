@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
 from elftools.elf.constants import SHN_INDICES
 from elftools.elf.elffile import (ELFFile, Section, StringTableSection,
@@ -12,7 +13,9 @@ from elfenums import ELFFlags
 from exceptions import (AlreadyExistsException, AlreadyLinkedException,
                         InvalidDataException, InvalidOperationException,
                         InvalidTableLinkageException)
-from ioreader import *
+from ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
+                      read_uint16, read_uint32, write_sbyte, write_sint16,
+                      write_sint32, write_ubyte, write_uint16, write_uint32)
 from kmhooks import HookData
 from kmword import KWord
 
@@ -89,12 +92,13 @@ class Linker(AddressMapper):
     def __str__(self) -> str:
         return f"Module linker; {self.__repr__()}"
 
-    def __iadd__(self, file: str):
-        with open(file, "rb") as _elf:
-            self._modules[file] = ELFFile(BytesIO(_elf.read()))
+    def __iadd__(self, elf: Path):
+        print(f"Adding {elf} as object")
+        self._modules[elf] = ELFFile(BytesIO(elf.read_bytes()))
 
-    def __isub__(self, file: str):
-        self._modules.pop(file, f"{file} does not exist in the current container")
+    def __isub__(self, elf: Path):
+        print(f"Removing {elf} from object list")
+        self._modules.pop(elf, f"{elf} does not exist in the current container")
 
     @property
     def outputSize(self) -> int:
@@ -112,9 +116,14 @@ class Linker(AddressMapper):
     def sbss2Size(self) -> int:
         return self.sbss2End - self.sbss2Start
 
+    @property
+    def modules(self) -> (Path, ELFFile):
+        for _key in self._modules:
+            yield _key, self._modules[_key]
+
     # """ MODULES """
 
-    def add_module(self, elf: str):
+    def add_module(self, elf: Path):
         if self._linked:
             raise AlreadyLinkedException("This linker has already been linked")
         if elf in self._modules.keys():
@@ -125,11 +134,11 @@ class Linker(AddressMapper):
     def clear_modules(self):
         self._modules = {}
 
-    def remove_module(self, file: str):
-        self.__isub__(file)
+    def remove_module(self, elf: Path):
+        self.__isub__(elf)
 
-    def pop_module(self, file: str):
-        return self._modules.pop(file)
+    def pop_module(self, elf: Path):
+        return self._modules.pop(elf)
 
     # """ LINKING """
 
@@ -146,6 +155,7 @@ class Linker(AddressMapper):
     def _do_link(self, symbolData: list):
         if self._linked:
             raise AlreadyLinkedException("This linker has already been linked")
+
         self._linked = True
 
         for key in symbolData:
@@ -172,53 +182,57 @@ class Linker(AddressMapper):
                     self._location += section.data_size
                     self._binaries.append(BytesIO(section.data()))
 
-    """
-    .init  80003100 00002430 000001c0
-    extab  80005540 00000048 00002600
-    extabindex  800055a0 0000005c 00002660
-    .text  80005600 0036dab4 000026c0
-    .ctors  803730c0 000003c0 00370180
-    .dtors  80373480 00000010 00370540
-    .rodata  803734a0 000381c0 00370560
-    .data  803ab660 0003e08b 003a8720
-        .bss  803e9700 00022ac0 003e67c0
-    .sdata  8040c1c0 00000d38 003e67c0
-    .sbss  8040cf00 00001c98 003e7500
-    .sdata2  8040eba0 00008c44 003e7500
-    .sbss2  804177e4 00000000 003f0144
-    .debug_srcinfo           000000 00000000
-    .debug_sfnames           000000 00000000
-    .debug           000000 00000000
-    .line           000000 00000000
-    """
-
     def _collect_sections(self):
         self._location = KWord(self.baseAddress, KWord.Types.ABSOLUTE)
         self.outputStart.value = self._location.value
 
+        self._externSymbols["_f_init"] = self._location.value
         self._import_sections(".init")
+        self._externSymbols["_e_init"] = self._location.value
+
         self._import_sections(".fini")
+        
+        self._externSymbols["_f_text"] = self._location.value
         self._import_sections(".text")
+        self._externSymbols["_e_text"] = self._location.value
 
         self.ctorStart.value = self._location.value
+        self._externSymbols["_f_ctors"] = self._location.value
         self._import_sections(".ctors")
+        self._externSymbols["_e_ctors"] = self._location.value
         self.ctorEnd.value = self._location.value
 
+
+        self._externSymbols["_f_dtors"] = self._location.value
         self._import_sections(".dtors")
+        self._externSymbols["_e_dtors"] = self._location.value
+        
+        self._externSymbols["_f_rodata"] = self._location.value
         self._import_sections(".rodata")
+        self._externSymbols["_e_rodata"] = self._location.value
+        
+        self._externSymbols["_f_data"] = self._location.value
         self._import_sections(".data")
+        self._externSymbols["_e_data"] = self._location.value
+
         self.outputEnd.value = self._location.value
 
         self.bssStart.value = self.outputEnd.value
+        self._externSymbols["_f_bss"] = self._location.value
         self._import_sections(".bss")
+        self._externSymbols["_e_bss"] = self._location.value
         self.bssEnd.value = self._location.value
 
         self.sbssStart.value = self.bssEnd.value
+        self._externSymbols["_f_sbss"] = self._location.value
         self._import_sections(".sbss")
+        self._externSymbols["_e_sbss"] = self._location.value
         self.sbssEnd.value = self._location.value
 
         self.sbss2Start.value = self.sbssEnd.value
+        self._externSymbols["_f_sbss2"] = self._location.value
         self._import_sections(".sbss2")
+        self._externSymbols["_e_sbss2"] = self._location.value
         self.sbss2End.value = self._location.value
 
         self.kamekStart.value = self._location.value
@@ -242,12 +256,7 @@ class Linker(AddressMapper):
         raise InvalidDataException(f"Undefined symbol \"{name}\"")
 
     def _build_symbol_tables(self):
-        self._globalSymbols["__ctor_loc"] = Linker.Symbol(self.ctorStart)
-        self._globalSymbols["__ctor_end"] = Linker.Symbol(self.ctorEnd)
-
-        for _elfkey in self._modules:
-            elf = self._modules[_elfkey]
-
+        for path, elf in self.modules:
             _locals = {}
 
             for section in [s for s in elf.iter_sections() if isinstance(s, SymbolTableSection)]:
@@ -257,7 +266,7 @@ class Linker(AddressMapper):
 
                 strTab = elf.get_section(strTabIdx)
 
-                self._symbolTableContents[self.__get_section_key(section)] = self._parse_symbol_table(_elfkey, elf, section, strTab, _locals)
+                self._symbolTableContents[self.__get_section_key(section)] = self._parse_symbol_table(path, elf, section, strTab, _locals)
 
     def _parse_symbol_table(self, elfpath: str, elf: ELFFile, symTab: SymbolTableSection, strTab: StringTableSection, _locals: dict) -> list:
         if symTab.header["sh_entsize"] != 16:
@@ -353,7 +362,6 @@ class Linker(AddressMapper):
             elif _symkey not in self._sectionBases:
                 continue
 
-            print(self._symbolTableContents[self.__get_section_key(symTab)], symIndex, len(self._symbolTableContents[self.__get_section_key(symTab)]))
             symName = self._symbolTableContents[self.__get_section_key(symTab)][symIndex]
 
             source = KWord(self._sectionBases[_symkey].value + relocation["r_offset"], KWord.Types.ABSOLUTE)

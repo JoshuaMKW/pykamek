@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 
-from exceptions import InvalidOperationException, InvalidCommandException
-from ioreader import *
-from linker import Linker
+from exceptions import InvalidCommandException, InvalidOperationException
+from ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
+                      read_uint16, read_uint32, write_sbyte, write_sint16,
+                      write_sint32, write_ubyte, write_uint16, write_uint32)
 from kmcommands import RelocCommand
 from kmhooks import KHook
 from kmword import KWord
+from linker import Linker
+
 
 class KamekBinary(object):
 
@@ -94,9 +98,8 @@ class KamekBinary(object):
     def seek(self, where: int, whence: int = 0):
         self.rawCode.seek(where, whence)
 
-    def read_ppc_code(self, f: str):
-        with open(f, "rb") as code:
-            self.rawCode = BytesIO(code.read())
+    def read_ppc_code(self, f: Path):
+        self.rawCode = BytesIO(f.read_bytes())
 
     def contains(self, addr: KWord) -> bool:
         return addr >= self.baseAddr and addr < (self.baseAddr + self.codeSize)
@@ -158,7 +161,7 @@ class KamekBinary(object):
         _packedBinary = BytesIO()
         _packedBinary.write(b"Kamek\x00\x00\x01")
         write_uint32(_packedBinary, self.bssSize.value)
-        write_uint32(_packedBinary, len(self.rawCode.getbuffer()))
+        write_uint32(_packedBinary, self.codeSize)
 
         _packedBinary.write(self.rawCode.getvalue())
 

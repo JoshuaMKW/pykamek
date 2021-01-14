@@ -127,3 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# tmp
+*.tmp
+tmp-*
+
+# map
+*.map
+
+# kmk
+*.kmk
+
+# kamek
+Kamek.exe

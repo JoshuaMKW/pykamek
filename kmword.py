@@ -32,40 +32,6 @@ class KWord(object):
 
         self._value = self.__clamp(value)
 
-    def __retrieve_value(self, other: KWord) -> int:
-        if isinstance(other, KWord):
-            return other.value
-        elif isinstance(other, int):
-            return self.__expand(self.__clamp(other))
-        else:
-            raise TypeError(f"Can't assign {type(other)} to class of type KWord using an operator")
-
-    def __expand(self, value: int) -> int:
-        if isinstance(value, KWord):
-            value = value.value
-        else:
-            value = int(value)
-        if self.signed:
-            if value > 0x7FFFFFFF:
-                value -= 0x100000000
-            elif value < 0:
-                value += 0x100000000
-        return value
-
-    @staticmethod
-    def __clamp(value: int) -> int:
-        if isinstance(value, KWord):
-            value = value.value
-        else:
-            value = int(value)
-        if value > 0x1FFFFFFFF or value < -0x1FFFFFFFF:
-            raise ValueError(f"'{value}' is too extreme to clamp")
-        elif value > 0xFFFFFFFF:
-            value -= 0x100000000
-        elif value < 0:
-            value += 0x100000000
-        return value
-
     @property
     def value(self) -> int:
         return self.__expand(self._value)
@@ -194,6 +160,9 @@ class KWord(object):
     def __hash__(self):
         return hash(self.value + (self.type << 32))
 
+    def __format__(self, fmt) -> str:
+        return f"{self.value:{fmt}}"
+
     def is_absolute_addr(self) -> bool:
         return self.type == KWord.Types.ABSOLUTE
 
@@ -232,3 +201,37 @@ class KWord(object):
             raise InvalidOperationException(f"{self.value} is ambiguous: absolute, top bit not set")
         if self.is_relative_addr() and (self & 0x80000000) != 0:
             raise InvalidOperationException(f"{self.value} is ambiguous: relative, top bit set")
+
+    def __retrieve_value(self, other: KWord) -> int:
+        if isinstance(other, KWord):
+            return other.value
+        elif isinstance(other, int):
+            return self.__expand(self.__clamp(other))
+        else:
+            raise TypeError(f"Can't assign {type(other)} to class of type KWord using an operator")
+
+    def __expand(self, value: int) -> int:
+        if isinstance(value, KWord):
+            value = value.value
+        else:
+            value = int(value)
+        if self.signed:
+            if value > 0x7FFFFFFF:
+                value -= 0x100000000
+            elif value < 0:
+                value += 0x100000000
+        return value
+
+    @staticmethod
+    def __clamp(value: int) -> int:
+        if isinstance(value, KWord):
+            value = value.value
+        else:
+            value = int(value)
+        if value > 0x1FFFFFFFF or value < -0x1FFFFFFFF:
+            raise ValueError(f"'{value}' is too extreme to clamp")
+        elif value > 0xFFFFFFFF:
+            value -= 0x100000000
+        elif value < 0:
+            value += 0x100000000
+        return value

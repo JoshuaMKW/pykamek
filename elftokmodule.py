@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import os
 import re
+
+from pathlib import Path
+from typing import List
 
 from addressmapper import AddressMapper
 from exceptions import InvalidDataException
@@ -10,19 +12,33 @@ from linker import Linker
 from kamek import KamekBinary
 from versionmap import VersionMapper
 
+def sorted_alphanumeric(l): 
+    """ Sort the given iterable in the way that humans expect.""" 
+    convert = lambda text: int(text) if text.isdigit() else text 
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', str(key))] 
+    return sorted(l, key = alphanum_key)
+
 class ElfHandler(Linker):
-    def __init__(self, base: AddressMapper, files: str):
+    def __init__(self, base: AddressMapper, files: [Path, List[Path]]):
         super().__init__(base)
 
         self.outputPath = None
         self.versionMap = None
         self.externals = {}
 
-        if isinstance(files, str):
+        if isinstance(files, Path):
             self.add_module(files)
+        elif isinstance(files, str):
+            self.add_module(Path(files))
         else:
-            for file in files:
-                self.add_module(file)
+            for obj in sorted_alphanumeric(files):
+                obj = Path(obj)
+                if obj.is_file():
+                    self.add_module(obj)
+                else:
+                    for f in sorted_alphanumeric(obj.iterdir()):
+                        if f.is_file:
+                            self.add_module(f)
 
     def __repr__(self):
         return f"repr={vars(self)}"
@@ -33,7 +49,7 @@ class ElfHandler(Linker):
     @staticmethod
     def read_externals(file: str) -> dict:
         symbolDict = {}
-        assignmentRegex = re.compile(r"^\s*([a-zA-Z0-9_<>\$]+)\s*=\s*0x([a-fA-F0-9]+)\s*(#.*)?$")
+        assignmentRegex = re.compile(r"^\s*([a-zA-Z0-9_<>,\-\$]+)\s*=\s*0x([a-fA-F0-9]+)\s*(#.*)?$")
 
         with open(file, "r") as f:
             for i, line in enumerate(f.readlines()):
@@ -45,7 +61,7 @@ class ElfHandler(Linker):
                     _symbol = match[0][0]
                     _address = match[0][1]
                 except IndexError:
-                    raise InvalidDataException(f"Symbol definition {_symbol} at line {i} is an invalid entry")
+                    raise InvalidDataException(f"Symbol definition {line.strip()} at line {i} is an invalid entry")
 
                 try:
                     symbolDict[_symbol] = int(_address, 16)
@@ -60,10 +76,10 @@ class ElfHandler(Linker):
 def main():
     parser = argparse.ArgumentParser("elftokuribo", description="ELF to Kuribo module converter")
 
-    parser.add_argument("elf", help="ELF object file(s)", nargs="+")
+    parser.add_argument("elf", help="ELF object file(s) and or folders of ELF object files", nargs="+")
     parser.add_argument("--dynamic", help="The module is dynamically relocated", action="store_true")
     parser.add_argument("--static", help="The module is statically located at ADDR", metavar="ADDR")
-    parser.add_argument("--externals", help="External linker map", metavar="FILE")
+    parser.add_argument("--extern", help="External linker map", metavar="FILE")
     parser.add_argument("--versionmap", help="Version map for address translations", metavar="FILE")
     parser.add_argument("-d", "--dest", help="Destination path", metavar="FILE")
 
@@ -83,18 +99,18 @@ def main():
         _baseAddr = int(args.static, 16)
 
     _externals = {}
-    if args.externals:
-        _externals = ElfHandler.read_externals(os.path.abspath(os.path.normpath(args.externals)))
+    if args.extern:
+        _externals = ElfHandler.read_externals(Path(args.extern).resolve())
 
     if args.versionmap:
-        _versionMap = VersionMapper(os.path.abspath(os.path.normpath(args.versionMap)))
+        _versionMap = VersionMapper(Path(args.versionmap).resolve())
     else:
         _versionMap = VersionMapper()
 
     if args.dest:
-        _dest = os.path.abspath(os.path.normpath(args.dest))
+        _dest = Path(args.dest).resolve()
     else:
-        _dest = os.path.abspath("build-$KV$.kmk")
+        _dest = Path("build-$KV$.kmk").resolve()
 
     for versionKey in _versionMap.mappers:
         print(f"Linking version {versionKey}")
@@ -106,9 +122,9 @@ def main():
         else:
             elfConverter.link_dynamic(_externals)
 
-        kf = KamekBinary()
-        kf.load_from_linker(elfConverter)
-        with open(_dest.replace("$KV$", versionKey), "wb") as kBinary:
+        kb = KamekBinary()
+        kb.load_from_linker(elfConverter)
+        with open(str(_dest).replace("$KV$", versionKey), "wb") as kBinary:
             kBinary.write(KamekBinary.pack_from(elfConverter).getvalue())
 
     print("Finished execution")

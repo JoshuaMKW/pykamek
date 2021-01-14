@@ -60,9 +60,9 @@ class BranchCommand(Command):
     def is_equal_reloc_relative(self) -> bool:
         return self.is_equal_reloc_types() and self.target.is_relative_addr()
 
-    def apply(self, file: "KamekBinary"):
-        if self.is_equal_reloc_absolute() and file.contains(self.address):
-            file.write_u32(self.address.value, self._generate_instruction())
+    def apply(self, f: "KamekBinary"):
+        if self.is_equal_reloc_absolute() and f.contains(self.address):
+            f.write_u32(self.address.value, self._generate_instruction())
 
     def pack_riivo(self) -> str:
         raise NotImplementedError()
@@ -105,25 +105,26 @@ class PatchExitCommand(Command):
     def is_equal_reloc_relative(self) -> bool:
         return self.is_equal_reloc_types() and self.target.is_relative_addr()
 
-    def apply(self, file: "KamekBinary") -> bool:
-        funcSize = file.get_symbol_size(self.address)
+    def apply(self, f: "KamekBinary") -> bool:
+        funcSize = f.get_symbol_size(self.address)
         funcEnd = self.address + (funcSize - 4)
 
         if funcSize < 4:
             raise InvalidOperationException("Queried function is too small")
 
-        if file.read_u32(funcEnd) != 0x4E800020:
+        if f.read_u32(funcEnd) != 0x4E800020:
             raise InvalidOperationException("Function does not end in blr")
 
         instrLoc = self.address
         while instrLoc < funcEnd:
-            insn = file.read_u32(instrLoc)
+            insn = f.read_u32(instrLoc)
             if (insn & 0xFC00FFFF == 0x4C000020):
                 raise InvalidOperationException("Function contains a return partway through")
+            instrLoc += 4
 
         self.endAddress = funcEnd
-        if self.is_equal_reloc_absolute() and file.contains(self.address):
-            file.write_u32(self.endAddress.value, self._generate_instruction())
+        if self.is_equal_reloc_absolute() and f.contains(self.address):
+            f.write_u32(self.endAddress.value, self._generate_instruction())
             return True
         else:
             return False
@@ -197,7 +198,7 @@ class WriteCommand(Command):
             self.original.assert_not_relative()
             write_uint32(io, self.original.value)
 
-    def apply(self, file: "KamekBinary") -> bool:
+    def apply(self, f: "KamekBinary") -> bool:
         return False
 
     def pack_riivo(self) -> str:
@@ -233,34 +234,34 @@ class RelocCommand(Command):
         self.target.assert_not_ambiguous()
         write_uint32(io, self.target.value)
 
-    def apply(self, file: "KamekBinary") -> bool:
+    def apply(self, f: "KamekBinary") -> bool:
         if self.id == Command.KCmdID.Rel24:
             if self.is_equal_reloc_types() and not self.target.is_value():
                 delta = self.target.value - self.address.value
 
-                insn = (file.read_u32(self.address.value) & 0xFC000003) | (delta & 0x3FFFFFC)
-                file.write_u32(self.address.value, insn)
+                insn = (f.read_u32(self.address.value) & 0xFC000003) | (delta & 0x3FFFFFC)
+                f.write_u32(self.address.value, insn)
                 return True
  
         elif self.id == Command.KCmdID.Addr32:
             if self.target.is_absolute_addr():
-                file.write_u32(self.address.value, self.target.value)
+                f.write_u32(self.address.value, self.target.value)
                 return True
 
         elif self.id == Command.KCmdID.Addr16Lo:
             if self.target.is_absolute_addr():
-                file.write_u16(self.address.value, self.target.value & 0xFFFF)
+                f.write_u16(self.address.value, self.target.value & 0xFFFF)
                 return True
 
         elif self.id == Command.KCmdID.Addr16Hi:
             if self.target.is_absolute_addr():
-                file.write_u16(self.address.value, (self.target.value >> 16) & 0xFFFF)
+                f.write_u16(self.address.value, (self.target.value >> 16) & 0xFFFF)
                 return True
 
         elif self.id == Command.KCmdID.Addr16Ha:
             if self.target.is_absolute_addr():
                 aTarget = ((self.target.value >> 16) + 1) & 0xFFFF if (self.target.value >> 16) & 0x8000 != 0 else (self.target.value >> 16) & 0xFFFF
-                file.write_u16(self.address.value, aTarget)
+                f.write_u16(self.address.value, aTarget)
                 return True
 
         else:

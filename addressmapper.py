@@ -18,7 +18,7 @@ class AddressMapper(object):
             return self.__repr__()
 
         def overlaps(self, other: AddressMapper.Mapping) -> bool:
-            return (self.end >= other.start) and (self.start <= other.end)
+            return self.end >= other.start and self.start <= other.end
 
     def __init__(self, base: AddressMapper = None):
         self.base = base
