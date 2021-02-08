@@ -358,7 +358,6 @@ class Linker(AddressMapper):
                         if argAddr in self._kamekRelocs:
                             args.append(self._kamekRelocs[argAddr])
                         else:
-                            print(len(self._memory.getbuffer()), argAddr.value - self.baseAddress.value)
                             self._memory.seek(argAddr.value - self.baseAddress.value)
                             args.append(KWord(read_uint32(self._memory), KWord.Types.VALUE))
                     self._kamekHooks.append(HookData(_type, args))
