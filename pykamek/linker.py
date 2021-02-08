@@ -49,11 +49,8 @@ class Linker(AddressMapper):
     def __init__(self, base: AddressMapper):
         super().__init__(base)
         self.baseAddress = KWord(0x80000000, KWord.Types.ABSOLUTE)
-        self.ctorStart, self.ctorEnd = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
         self.outputStart, self.outputEnd = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
         self.bssStart, self.bssEnd = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
-        self.sbssStart, self.sbssEnd = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
-        self.sbss2Start, self.sbss2End = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
         self.kamekStart, self.kamekEnd = KWord(0, KWord.Types.ABSOLUTE), KWord(0, KWord.Types.ABSOLUTE)
 
         # SECTIONS
@@ -109,14 +106,6 @@ class Linker(AddressMapper):
         return self.bssEnd - self.bssStart
 
     @property
-    def sbssSize(self) -> int:
-        return self.sbssEnd - self.sbssStart
-
-    @property
-    def sbss2Size(self) -> int:
-        return self.sbss2End - self.sbss2Start
-
-    @property
     def modules(self) -> (Path, ELFFile):
         for _key in self._modules:
             yield _key, self._modules[_key]
@@ -168,72 +157,44 @@ class Linker(AddressMapper):
 
     # """ SECTIONS """
 
-    def _import_sections(self, prefix: str, alignEnd: int = 4):
+    def _import_sections(self, prefix: str, alignEnd: int = 4, padding: int = 0):
+        imported = False
+        baseAddress = self._location.value
+
         for elf in self._modules.values():
             for section in [section for section in elf.iter_sections() if section.name.startswith(prefix)]:
                 self._sectionBases[self.__get_section_key(section)] = KWord(self._location, KWord.Types.ABSOLUTE)
-                
-                if alignEnd > 0 and section.data_size % alignEnd != 0:
-                    self._location += (section.data_size + (alignEnd-1)) & -alignEnd
+                self._location += section.data_size
+                self._binaries.append(BytesIO(section.data()))
+                imported = True
+        
+        if imported:
+            self._externSymbols[f"_f_{prefix[1:]}"] = baseAddress
+            self._externSymbols[f"_e_{prefix[1:]}"] = self._location.value - padding
+            self._location += padding
+            if alignEnd > 0 and self._location.value % alignEnd != 0:
+                padlen = alignEnd - (self._location.value % alignEnd) + padding
+                self._location = (self._location + (alignEnd-1)) & -alignEnd
+                self._binaries.append(BytesIO(b"\x00" * padlen))
 
-                    padlen = alignEnd - (section.data_size % alignEnd)
-                    self._binaries.append(BytesIO(section.data() + b"\x00" * padlen))
-                else:
-                    self._location += section.data_size
-                    self._binaries.append(BytesIO(section.data()))
 
     def _collect_sections(self):
         self._location = KWord(self.baseAddress, KWord.Types.ABSOLUTE)
         self.outputStart.value = self._location.value
 
-        self._externSymbols["_f_init"] = self._location.value
         self._import_sections(".init")
-        self._externSymbols["_e_init"] = self._location.value
-
         self._import_sections(".fini")
-        
-        self._externSymbols["_f_text"] = self._location.value
         self._import_sections(".text")
-        self._externSymbols["_e_text"] = self._location.value
-
-        self.ctorStart.value = self._location.value
-        self._externSymbols["_f_ctors"] = self._location.value
-        self._import_sections(".ctors")
-        self._externSymbols["_e_ctors"] = self._location.value
-        self.ctorEnd.value = self._location.value
-
-
-        self._externSymbols["_f_dtors"] = self._location.value
-        self._import_sections(".dtors")
-        self._externSymbols["_e_dtors"] = self._location.value
-        
-        self._externSymbols["_f_rodata"] = self._location.value
-        self._import_sections(".rodata")
-        self._externSymbols["_e_rodata"] = self._location.value
-        
-        self._externSymbols["_f_data"] = self._location.value
-        self._import_sections(".data")
-        self._externSymbols["_e_data"] = self._location.value
+        self._import_sections(".ctors", alignEnd=32, padding=4)
+        self._import_sections(".dtors", alignEnd=32, padding=4)
+        self._import_sections(".rodata", alignEnd=32)
+        self._import_sections(".data", alignEnd=32)
 
         self.outputEnd.value = self._location.value
 
         self.bssStart.value = self.outputEnd.value
-        self._externSymbols["_f_bss"] = self._location.value
-        self._import_sections(".bss")
-        self._externSymbols["_e_bss"] = self._location.value
+        self._import_sections(".bss", alignEnd=32)
         self.bssEnd.value = self._location.value
-
-        self.sbssStart.value = self.bssEnd.value
-        self._externSymbols["_f_sbss"] = self._location.value
-        self._import_sections(".sbss")
-        self._externSymbols["_e_sbss"] = self._location.value
-        self.sbssEnd.value = self._location.value
-
-        self.sbss2Start.value = self.sbssEnd.value
-        self._externSymbols["_f_sbss2"] = self._location.value
-        self._import_sections(".sbss2")
-        self._externSymbols["_e_sbss2"] = self._location.value
-        self.sbss2End.value = self._location.value
 
         self.kamekStart.value = self._location.value
         self._import_sections(".kamek")
@@ -397,6 +358,7 @@ class Linker(AddressMapper):
                         if argAddr in self._kamekRelocs:
                             args.append(self._kamekRelocs[argAddr])
                         else:
+                            print(len(self._memory.getbuffer()), argAddr.value - self.baseAddress.value)
                             self._memory.seek(argAddr.value - self.baseAddress.value)
                             args.append(KWord(read_uint32(self._memory), KWord.Types.VALUE))
                     self._kamekHooks.append(HookData(_type, args))

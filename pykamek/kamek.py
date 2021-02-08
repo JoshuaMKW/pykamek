@@ -6,10 +6,12 @@ from pathlib import Path
 from dolreader.dol import DolFile
 from dolreader.section import TextSection
 
-from pykamek.exceptions import InvalidCommandException, InvalidOperationException
+from pykamek.exceptions import (InvalidCommandException,
+                                InvalidOperationException)
 from pykamek.ioreader import (read_sbyte, read_sint16, read_sint32, read_ubyte,
-                      read_uint16, read_uint32, write_sbyte, write_sint16,
-                      write_sint32, write_ubyte, write_uint16, write_uint32)
+                              read_uint16, read_uint32, write_sbyte,
+                              write_sint16, write_sint32, write_ubyte,
+                              write_uint16, write_uint32)
 from pykamek.kmcommands import RelocCommand
 from pykamek.kmhooks import KHook
 from pykamek.kmword import KWord
@@ -26,8 +28,6 @@ class KamekBinary(object):
 
         self.baseAddr = baseAddr
         self.bssSize = KWord(0, KWord.Types.VALUE)
-        self.sbssSize = KWord(0, KWord.Types.VALUE)
-        self.sbss2Size = KWord(0, KWord.Types.VALUE)
 
         self.commands = {}
         self.hooks = []
@@ -123,8 +123,6 @@ class KamekBinary(object):
 
         self.baseAddr = linker.baseAddress
         self.bssSize = linker.bssSize
-        self.sbssSize = linker.sbssSize
-        self.sbss2Size = linker.sbss2Size
         
         for _key in linker._symbolSizes:
             self.symbolSizes[_key] = linker._symbolSizes[_key]
@@ -199,5 +197,5 @@ class KamekBinary(object):
         dol.append_section(TextSection(self.baseAddr.value, self.rawCode))
 
         for _key in self.commands:
-            self.commands[_key].apply_to_dol(dol)
+            self.commands[_key].apply_to_dol(dol, self.mapper)
 

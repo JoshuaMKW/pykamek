@@ -83,7 +83,7 @@ class BranchCommand(Command):
 
         return list(code | (0x4000000 << 32))
 
-    def apply_to_dol(self, dol: DolFile):
+    def apply_to_dol(self, dol: DolFile, linker: "Linker"):
         self.address.assert_absolute()
         self.target.assert_absolute()
 
@@ -301,7 +301,7 @@ class WriteCommand(Command):
 
         raise InvalidOperationException(f"Invalid command type {self.valueType} specified")
 
-    def apply_to_dol(self, dol: DolFile):
+    def apply_to_dol(self, dol: DolFile, linker: "Linker"):
         self.address.assert_absolute()
         if self.valueType == WriteCommand.Type.Pointer:
             self.value.assert_absolute()
@@ -391,7 +391,10 @@ class RelocCommand(Command):
 
         elif self.id == Command.KCmdID.Addr16Ha:
             if self.target.is_absolute_addr():
-                aTarget = ((self.target.value >> 16) + 1) & 0xFFFF if (self.target.value >> 16) & 0x8000 != 0 else (self.target.value >> 16) & 0xFFFF
+                aTarget = (self.target.value >> 16) & 0xFFFF
+                if self.target & 0x8000 == 0x8000:
+                    aTarget += 1
+
                 f.write_u16(self.address.value, aTarget)
                 return True
 
@@ -407,7 +410,7 @@ class RelocCommand(Command):
     def pack_gecko_codes(self) -> list:
         raise NotImplementedError()
 
-    def apply_to_dol(self, dol: DolFile):
+    def apply_to_dol(self, dol: DolFile, linker: "Linker"):
         self.address.assert_absolute()
         self.target.assert_absolute()
 
@@ -425,16 +428,19 @@ class RelocCommand(Command):
 
         elif self.id == Command.KCmdID.Addr16Lo:
             dol.seek(self.address.value)
-            write_uint32(dol, self.target.value & 0xFFFF)
+            write_uint16(dol, self.target.value & 0xFFFF)
 
         elif self.id == Command.KCmdID.Addr16Hi:
             dol.seek(self.address.value)
-            write_uint32(dol, (self.target.value >> 16) & 0xFFFF)
+            write_uint16(dol, (self.target.value >> 16) & 0xFFFF)
 
         elif self.id == Command.KCmdID.Addr16Ha:
-            aTarget = ((self.target.value >> 16) + 1) & 0xFFFF if (self.target.value >> 16) & 0x8000 != 0 else (self.target.value >> 16) & 0xFFFF
+            aTarget = (self.target.value >> 16) & 0xFFFF
+            if self.target & 0x8000 == 0x8000:
+                aTarget += 1
+                
             dol.seek(self.address.value)
-            write_uint32(dol, aTarget)
+            write_uint16(dol, aTarget) 
 
         else:
             raise NotImplementedError("Unrecognized relocation type")
