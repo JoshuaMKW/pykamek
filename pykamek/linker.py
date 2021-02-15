@@ -168,9 +168,9 @@ class Linker(AddressMapper):
                     continue
 
                 self._sectionBases[self.__get_section_key(section)] = KWord(self._location, KWord.Types.ABSOLUTE)
-                padding = b"\x00" * (4 - (self._location.value % 4))
+                sectionPadding = b"\x00" * (4 - (self._location.value % 4))
                 self._location += (section.data_size + 3) & -4
-                self._binaries.append(BytesIO(section.data() + padding))
+                self._binaries.append(BytesIO(section.data() + sectionPadding))
                 imported = True
         
         if imported:
