@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pykamek.exceptions import InvalidOperationException
 
+
 class KWord(object):
     class Types:
         VALUE = 1
@@ -35,7 +36,7 @@ class KWord(object):
     @property
     def value(self) -> int:
         return self.__expand(self._value)
-        
+
     @value.setter
     def value(self, value: int):
         self._value = self.__clamp(value)
@@ -46,58 +47,58 @@ class KWord(object):
     def __str__(self) -> str:
         return f"Kamek extended integer; {self.__repr__()}"
 
-    def __add__(self, other: KWord) -> KWord: 
+    def __add__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value + self.__retrieve_value(other)), self.type)
 
-    def __sub__(self, other: KWord) -> KWord: 
+    def __sub__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value - self.__retrieve_value(other)), self.type)
 
-    def __mul__(self, other: KWord) -> KWord: 
+    def __mul__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value * self.__retrieve_value(other)), self.type)
 
-    def __truediv__(self, other: KWord) -> KWord: 
+    def __truediv__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value / self.__retrieve_value(other)), self.type)
 
-    def __floordiv__(self, other: KWord) -> KWord: 
+    def __floordiv__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value // self.__retrieve_value(other)), self.type)
 
-    def __mod__(self, other: KWord) -> KWord: 
+    def __mod__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value % self.__retrieve_value(other)), self.type)
 
-    def __pow__(self, other: KWord) -> KWord: 
+    def __pow__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value ** self.__retrieve_value(other)), self.type)
 
-    def __rshift__(self, other: KWord) -> KWord: 
+    def __rshift__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value >> self.__retrieve_value(other)), self.type)
 
-    def __lshift__(self, other: KWord) -> KWord: 
+    def __lshift__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value << self.__retrieve_value(other)), self.type)
 
-    def __and__(self, other: KWord) -> KWord: 
+    def __and__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value & self.__retrieve_value(other)), self.type)
 
-    def __or__(self, other: KWord) -> KWord: 
+    def __or__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value | self.__retrieve_value(other)), self.type)
 
-    def __xor__(self, other: KWord) -> KWord: 
+    def __xor__(self, other: KWord) -> KWord:
         return KWord(self.__clamp(self.value ^ self.__retrieve_value(other)), self.type)
 
-    def __lt__(self, other: KWord) -> bool: 
+    def __lt__(self, other: KWord) -> bool:
         return self.value < self.__retrieve_value(other)
 
-    def __gt__(self, other: KWord) -> bool: 
+    def __gt__(self, other: KWord) -> bool:
         return self.value > self.__retrieve_value(other)
 
-    def __le__(self, other: KWord) -> bool: 
+    def __le__(self, other: KWord) -> bool:
         return self.value <= self.__retrieve_value(other)
 
-    def __ge__(self, other: KWord) -> bool: 
+    def __ge__(self, other: KWord) -> bool:
         return self.value >= self.__retrieve_value(other)
 
-    def __eq__(self, other: KWord) -> bool: 
+    def __eq__(self, other: KWord) -> bool:
         return self.value == self.__retrieve_value(other)
 
-    def __ne__(self, other: KWord) -> bool: 
+    def __ne__(self, other: KWord) -> bool:
         return self.value != self.__retrieve_value(other)
 
     def __iadd__(self, other: KWord):
@@ -148,13 +149,13 @@ class KWord(object):
         self.value = self.__clamp(self._value ^ self.__retrieve_value(other))
         return self
 
-    def __neg__(self) -> KWord: 
+    def __neg__(self) -> KWord:
         return KWord(-self.value & 0xFFFFFFFF, self.type)
 
-    def __pos__(self) -> KWord: 
+    def __pos__(self) -> KWord:
         return KWord(+self.value & 0xFFFFFFFF, self.type)
 
-    def __invert__(self) -> KWord: 
+    def __invert__(self) -> KWord:
         return KWord(~self.value & 0xFFFFFFFF, self.type)
 
     def __hash__(self):
@@ -174,33 +175,41 @@ class KWord(object):
 
     def assert_value(self):
         if not self.is_value():
-            raise InvalidOperationException(f"KWord {self.value} must be a value in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must be a value in this context")
 
     def assert_not_value(self):
         if self.is_value():
-            raise InvalidOperationException(f"KWord {self.value} must not be a value in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must not be a value in this context")
 
     def assert_relative(self):
         if not self.is_relative_addr():
-            raise InvalidOperationException(f"KWord {self.value} must be a relative address in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must be a relative address in this context")
 
     def assert_not_relative(self):
         if self.is_relative_addr():
-            raise InvalidOperationException(f"KWord {self.value} must not be a relative address in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must not be a relative address in this context")
 
     def assert_absolute(self):
         if not self.is_absolute_addr():
-            raise InvalidOperationException(f"KWord {self.value} must be a absolute address in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must be a absolute address in this context")
 
     def assert_not_absolute(self):
         if self.is_absolute_addr():
-            raise InvalidOperationException(f"KWord {self.value} must not be a absolute address in this context")
+            raise InvalidOperationException(
+                f"KWord {self.value} must not be a absolute address in this context")
 
     def assert_not_ambiguous(self):
         if self.is_absolute_addr() and (self & 0x80000000) == 0:
-            raise InvalidOperationException(f"{self.value} is ambiguous: absolute, top bit not set")
+            raise InvalidOperationException(
+                f"{self.value} is ambiguous: absolute, top bit not set")
         if self.is_relative_addr() and (self & 0x80000000) != 0:
-            raise InvalidOperationException(f"{self.value} is ambiguous: relative, top bit set")
+            raise InvalidOperationException(
+                f"{self.value} is ambiguous: relative, top bit set")
 
     def __retrieve_value(self, other: KWord) -> int:
         if isinstance(other, KWord):
@@ -208,7 +217,8 @@ class KWord(object):
         elif isinstance(other, int):
             return self.__expand(self.__clamp(other))
         else:
-            raise TypeError(f"Can't assign {type(other)} to class of type KWord using an operator")
+            raise TypeError(
+                f"Can't assign {type(other)} to class of type KWord using an operator")
 
     def __expand(self, value: int) -> int:
         if isinstance(value, KWord):

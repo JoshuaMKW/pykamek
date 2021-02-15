@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from typing import Tuple
 
 from elftools.elf.constants import SHN_INDICES
 from elftools.elf.elffile import (ELFFile, Section, StringTableSection,
@@ -106,7 +107,7 @@ class Linker(AddressMapper):
         return self.bssEnd - self.bssStart
 
     @property
-    def modules(self) -> (Path, ELFFile):
+    def modules(self) -> Tuple[Path, ELFFile]:
         for _key in self._modules:
             yield _key, self._modules[_key]
 
@@ -162,10 +163,14 @@ class Linker(AddressMapper):
         baseAddress = self._location.value
 
         for elf in self._modules.values():
-            for section in [section for section in elf.iter_sections() if section.name.startswith(prefix)]:
+            for section in elf.iter_sections():
+                if not section.name.startswith(prefix):
+                    continue
+
                 self._sectionBases[self.__get_section_key(section)] = KWord(self._location, KWord.Types.ABSOLUTE)
-                self._location += section.data_size
-                self._binaries.append(BytesIO(section.data()))
+                padding = b"\x00" * (4 - (self._location.value % 4))
+                self._location += (section.data_size + 3) & -4
+                self._binaries.append(BytesIO(section.data() + padding))
                 imported = True
         
         if imported:
@@ -220,7 +225,10 @@ class Linker(AddressMapper):
         for path, elf in self.modules:
             _locals = {}
 
-            for section in [s for s in elf.iter_sections() if isinstance(s, SymbolTableSection)]:
+            for section in elf.iter_sections():
+                if not isinstance(section, SymbolTableSection):
+                    continue
+
                 strTabIdx = section.header["sh_link"]
                 if strTabIdx <= 0 or strTabIdx >= elf.num_sections():
                     raise InvalidTableLinkageException("Symbol table is not linked to a string table")

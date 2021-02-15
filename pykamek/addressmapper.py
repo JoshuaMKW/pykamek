@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pykamek.exceptions import InvalidMappingException
 
+
 class AddressMapper(object):
 
     class Mapping(object):
@@ -26,13 +27,15 @@ class AddressMapper(object):
 
     def add_mapping(self, start: int, end: int, delta: int):
         if start > end:
-            raise InvalidMappingException(f"Cannot map {start:8X}-{end:8X} as start is higher than end")
+            raise InvalidMappingException(
+                f"Cannot map {start:8X}-{end:8X} as start is higher than end")
 
         newMapping = AddressMapper.Mapping(start, end, delta)
 
         for mapping in self._mappings:
             if mapping.overlaps(newMapping):
-                raise InvalidMappingException(f"New mapping {newMapping} overlaps existing mapping {mapping}")
+                raise InvalidMappingException(
+                    f"New mapping {newMapping} overlaps existing mapping {mapping}")
 
         self._mappings.append(newMapping)
 

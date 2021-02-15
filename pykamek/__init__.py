@@ -1,31 +1,33 @@
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 __author__ = 'JoshuaMK'
 __credits__ = 'Treeki'
 
 import re
-
 from argparse import ArgumentParser
 from io import BytesIO
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 from dolreader.dol import DolFile
 
 from pykamek import __version__
 from pykamek.addressmapper import AddressMapper
 from pykamek.exceptions import InvalidDataException
-from pykamek.linker import Linker
 from pykamek.kamek import KamekBinary
+from pykamek.linker import Linker
 from pykamek.versionmap import VersionMapper
 
-def sorted_alphanumeric(l): 
-    """ Sort the given iterable in the way that humans expect.""" 
-    convert = lambda text: int(text) if text.isdigit() else text 
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', str(key))] 
-    return sorted(l, key = alphanum_key)
+
+def sorted_alphanumeric(l):
+    """ Sort the given iterable in the way that humans expect."""
+    def convert(text): return int(text) if text.isdigit() else text
+    def alphanum_key(key): return [convert(c)
+                                   for c in re.split('([0-9]+)', str(key))]
+    return sorted(l, key=alphanum_key)
+
 
 class ElfHandler(Linker):
-    def __init__(self, base: AddressMapper, files: [Path, List[Path]]):
+    def __init__(self, base: AddressMapper, files: Union[Path, List[Path]]):
         super().__init__(base)
 
         self.outputPath = None
@@ -55,7 +57,8 @@ class ElfHandler(Linker):
     @staticmethod
     def read_externals(file: str) -> dict:
         symbolDict = {}
-        assignmentRegex = re.compile(r"^\s*([a-zA-Z0-9_<>,\-\$]+)\s*=\s*0x([a-fA-F0-9]+)\s*(#.*)?$")
+        assignmentRegex = re.compile(
+            r"^\s*([a-zA-Z0-9_<>,\-\$]+)\s*=\s*0x([a-fA-F0-9]+)\s*(#.*)?$")
 
         with open(file, "r") as f:
             for i, line in enumerate(f.readlines()):
@@ -67,32 +70,42 @@ class ElfHandler(Linker):
                     _symbol = match[0][0]
                     _address = match[0][1]
                 except IndexError:
-                    raise InvalidDataException(f"Symbol definition {line.strip()} at line {i} is an invalid entry")
+                    raise InvalidDataException(
+                        f"Symbol definition {line.strip()} at line {i} is an invalid entry")
 
                 try:
                     symbolDict[_symbol] = int(_address, 16)
                 except ValueError:
-                    raise InvalidDataException(f"Address {_address} at line {i} is not a hexadecimal number")
+                    raise InvalidDataException(
+                        f"Address {_address} at line {i} is not a hexadecimal number")
 
         return symbolDict
 
-    def exec_jobs(self):
-        pass
 
 def main(args: list):
-    parser = ArgumentParser(f"pykamek {__version__}", description="ELF to Kuribo module converter")
+    parser = ArgumentParser(
+        f"pykamek {__version__}", description="ELF to Kuribo module converter")
 
-    parser.add_argument("elf", help="ELF object file(s) and or folders of ELF object files", nargs="+")
-    parser.add_argument("--dynamic", help="The module is dynamically relocated", action="store_true")
-    parser.add_argument("--static", help="The module is statically located at ADDR", metavar="ADDR")
-    parser.add_argument("--output-kamek", help="File to output Kamek Binary", metavar="FILE")
-    parser.add_argument("--output-riiv", help="File to output riivolution XML", metavar="FILE")
-    parser.add_argument("--output-gecko", help="File to output gecko code", metavar="FILE")
-    parser.add_argument("--output-code", help="File to output raw code", metavar="FILE")
+    parser.add_argument(
+        "elf", help="ELF object file(s) and or folders of ELF object files", nargs="+")
+    parser.add_argument(
+        "--dynamic", help="The module is dynamically relocated", action="store_true")
+    parser.add_argument(
+        "--static", help="The module is statically located at ADDR", metavar="ADDR")
+    parser.add_argument(
+        "--output-kamek", help="File to output Kamek Binary", metavar="FILE")
+    parser.add_argument(
+        "--output-riiv", help="File to output riivolution XML", metavar="FILE")
+    parser.add_argument(
+        "--output-gecko", help="File to output gecko code", metavar="FILE")
+    parser.add_argument(
+        "--output-code", help="File to output raw code", metavar="FILE")
     parser.add_argument("--input-dol", help="Input DOL file", metavar="FILE")
-    parser.add_argument("--output-dol", help="File to output patched DOL", metavar="FILE")
+    parser.add_argument(
+        "--output-dol", help="File to output patched DOL", metavar="FILE")
     parser.add_argument("--extern", help="External linker map", metavar="FILE")
-    parser.add_argument("--versionmap", help="Version map for address translations", metavar="FILE")
+    parser.add_argument(
+        "--versionmap", help="Version map for address translations", metavar="FILE")
 
     args = parser.parse_args(args)
 

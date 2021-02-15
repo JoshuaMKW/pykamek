@@ -1,54 +1,54 @@
 import struct
 
-def read_sbyte(f):
+def read_sbyte(f) -> int:
     return struct.unpack("b", f.read(1))[0]
 
 def write_sbyte(f, val):
     f.write(struct.pack("b", val))
 
-def read_sint16(f):
+def read_sint16(f) -> int:
     return struct.unpack(">h", f.read(2))[0]
 
 def write_sint16(f, val):
     f.write(struct.pack(">h", val))
 
-def read_sint32(f):
+def read_sint32(f) -> int:
     return struct.unpack(">i", f.read(4))[0]
 
 def write_sint32(f, val):
     f.write(struct.pack(">i", val))
 
-def read_ubyte(f):
+def read_ubyte(f) -> int:
     return struct.unpack("B", f.read(1))[0]
 
 def write_ubyte(f, val):
     f.write(struct.pack("B", val))
 
-def read_uint16(f):
+def read_uint16(f) -> int:
     return struct.unpack(">H", f.read(2))[0]
 
 def write_uint16(f, val):
     f.write(struct.pack(">H", val))
 
-def read_uint32(f):
+def read_uint32(f) -> int:
     return struct.unpack(">I", f.read(4))[0]
 
 def write_uint32(f, val):
     f.write(struct.pack(">I", val))
 
-def read_float(f):
+def read_float(f) -> float:
     return struct.unpack(">f", f.read(4))[0]
 
 def write_float(f, val):
     f.write(struct.pack(">f", val))
 
-def read_double(f):
+def read_double(f) -> float:
     return struct.unpack(">d", f.read(4))[0]
 
 def write_double(f, val):
     f.write(struct.pack(">d", val))
 
-def read_bool(f, vSize=1):
+def read_bool(f, vSize=1) -> bool:
     return struct.unpack("B", f.read(vSize))[0] > 0
 
 def write_bool(f, val, vSize=1):

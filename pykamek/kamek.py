@@ -112,18 +112,20 @@ class KamekBinary(object):
 
     def load_from_linker(self, linker: Linker):
         if self.codeSize > 0:
-            raise InvalidOperationException("This Kamek binary already has stuff in it")
-        
+            raise InvalidOperationException(
+                "This Kamek binary already has stuff in it")
+
         self.mapper = linker
 
-        #Extract only code/data sections
-        linker._memory.seek(linker.outputStart.value - linker.baseAddress.value)
-        
+        # Extract only code/data sections
+        linker._memory.seek(linker.outputStart.value -
+                            linker.baseAddress.value)
+
         self.rawCode = BytesIO(linker._memory.read(linker.outputSize.value))
 
         self.baseAddr = linker.baseAddress
         self.bssSize = linker.bssSize
-        
+
         for _key in linker._symbolSizes:
             self.symbolSizes[_key] = linker._symbolSizes[_key]
 
@@ -137,16 +139,19 @@ class KamekBinary(object):
     def add_relocs_as_commands(self, relocs: list):
         for rel in relocs:
             if rel.source in self.commands:
-                raise InvalidOperationException(f"Duplicate commands for address {rel.source.value:X}")
+                raise InvalidOperationException(
+                    f"Duplicate commands for address {rel.source.value:X}")
 
-            self.commands[rel.source] = RelocCommand(rel.source, rel.dest, rel.type)
+            self.commands[rel.source] = RelocCommand(
+                rel.source, rel.dest, rel.type)
 
     def apply_hook(self, hookData):
         hook = KHook.create(hookData, self.mapper)
         for cmd in hook.commands:
             if cmd.address in self.commands:
-                raise InvalidOperationException(f"Duplicate commands for address {cmd.address.value:X}")
-            
+                raise InvalidOperationException(
+                    f"Duplicate commands for address {cmd.address.value:X}")
+
             self.commands[cmd.address] = cmd
         self.hooks.append(hook)
 
@@ -172,13 +177,14 @@ class KamekBinary(object):
 
             if address.is_relative_addr():
                 if address > 0xFFFFFF:
-                    raise InvalidCommandException(f"Given address {address} is too high for packed command")
+                    raise InvalidCommandException(
+                        f"Given address {address} is too high for packed command")
 
                 write_uint32(_packedBinary, cmd | address.value)
             else:
                 write_uint32(_packedBinary, cmd | 0xFFFFFE)
                 write_uint32(_packedBinary, address.value)
-            
+
             self.commands[_key].write_arguments(_packedBinary)
 
         _packedBinary.seek(0)
@@ -192,10 +198,10 @@ class KamekBinary(object):
 
     def apply_to_dol(self, dol: DolFile):
         if self.baseAddr.type == KWord.Types.RELATIVE:
-            raise InvalidOperationException("Cannot pack a dynamically linked binary into a DOL")
+            raise InvalidOperationException(
+                "Cannot pack a dynamically linked binary into a DOL")
 
         dol.append_section(TextSection(self.baseAddr.value, self.rawCode))
 
         for _key in self.commands:
             self.commands[_key].apply_to_dol(dol, self.mapper)
-

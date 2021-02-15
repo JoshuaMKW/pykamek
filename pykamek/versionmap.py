@@ -1,11 +1,13 @@
-import os
 import re
+from pathlib import Path
+from typing import Union
 
-from pykamek.exceptions import InvalidDataException
 from pykamek.addressmapper import AddressMapper
+from pykamek.exceptions import InvalidDataException
+
 
 class VersionMapper(object):
-    def __init__(self, path: str = None):
+    def __init__(self, path: Union[Path, str] = None):
         self.mappers = {}
         if path is not None:
             self.open_version_map(path)
@@ -18,9 +20,8 @@ class VersionMapper(object):
     def __str__(self) -> str:
         return f"Version Mapper; {self.__repr__()}"
 
-    def open_version_map(self, path):
+    def open_version_map(self, path: Union[Path, str]):
         commentRegex = re.compile(r"^\s*#")
-        emptyLineRegex = re.compile(r"^\s*$")
         sectionRegex = re.compile(r"^\s*\[([a-zA-Z0-9_.]+)\]$")
         extendRegex = re.compile(r"^\s*extend ([a-zA-Z0-9_.]+)\s*(#.*)?$")
         mappingRegex = re.compile(r"^\s*([a-fA-F0-9]{8})-((?:[a-fA-F0-9]{8})|\*)\s*:\s*([-+])0x([a-fA-F0-9]+)\s*(#.*)?$")
@@ -28,7 +29,9 @@ class VersionMapper(object):
         curVersionName = None
         curVersion = None
 
-        with open(path, "r") as vMap:
+        path = Path(path)
+
+        with path.open("r") as vMap:
             for i, line in enumerate(vMap.readlines()):
                 if line.strip() == "":
                     continue
@@ -65,7 +68,3 @@ class VersionMapper(object):
                         curVersion.add_mapping(startAddress, endAddress, delta)
                     else:
                         print(f"Bad data at line {i} in versions file")
-
-                        
-                
-verMapper = VersionMapper(r"C:\Users\Kyler-Josh\source\repos\Kamek\examples\versions-nsmbw.txt")

@@ -7,8 +7,8 @@ from dolreader.exceptions import UnmappedAddressError
 
 from pykamek.elfenums import ELFFlags
 from pykamek.exceptions import InvalidOperationException
-from pykamek.ioreader import (read_ubyte, read_uint16, read_uint32, write_ubyte,
-                      write_uint16, write_uint32)
+from pykamek.ioreader import (read_ubyte, read_uint16, read_uint32,
+                              write_ubyte, write_uint16, write_uint32)
 from pykamek.kmword import KWord
 
 
@@ -24,7 +24,7 @@ class Command(object):
         Rel24 = 10
 
         # these are new
-        WritePointer = 1 # same as Addr32 on purpose
+        WritePointer = 1  # same as Addr32 on purpose
         Write32 = 32
         Write16 = 33
         Write8 = 34
@@ -39,6 +39,7 @@ class Command(object):
     def __init__(self, kId: KCmdID, address: KWord):
         self.id = kId
         self.address = address
+
 
 class BranchCommand(Command):
     def __init__(self, source: KWord, target: KWord, isLink: bool):
@@ -79,7 +80,8 @@ class BranchCommand(Command):
         self.address.assert_absolute()
         self.target.assert_absolute()
 
-        code = ((self.address.value & 0x1FFFFFF) << 32) | self._generate_instruction()
+        code = ((self.address.value & 0x1FFFFFF) <<
+                32) | self._generate_instruction()
 
         return list(code | (0x4000000 << 32))
 
@@ -94,6 +96,7 @@ class BranchCommand(Command):
         delta = self.target - self.address
         insn = 0x48000001 if self.id == Command.KCmdID.BranchLink else 0x48000000
         return insn | (delta.value & 0x3FFFFFC)
+
 
 class PatchExitCommand(Command):
     def __init__(self, source: KWord, target: KWord):
@@ -136,7 +139,8 @@ class PatchExitCommand(Command):
         while instrLoc < funcEnd:
             insn = f.read_u32(instrLoc)
             if (insn & 0xFC00FFFF == 0x4C000020):
-                raise InvalidOperationException("Function contains a return partway through")
+                raise InvalidOperationException(
+                    "Function contains a return partway through")
             instrLoc += 4
 
         self.endAddress = funcEnd
@@ -168,7 +172,8 @@ class PatchExitCommand(Command):
         while instrLoc < funcEnd:
             insn = read_uint32(dol)
             if (insn & 0xFC00FFFF == 0x4C000020):
-                raise InvalidOperationException("Function contains a return partway through")
+                raise InvalidOperationException(
+                    "Function contains a return partway through")
             instrLoc += 4
 
         self.endAddress = funcEnd
@@ -185,7 +190,8 @@ class PatchExitCommand(Command):
         delta = self.target - self.address
         insn = 0x48000001 if self.id == Command.KCmdID.BranchLink else 0x48000000
         return insn | (delta.value & 0x3FFFFFC)
-     
+
+
 class WriteCommand(Command):
     class Type:
         Pointer = 1
@@ -205,7 +211,7 @@ class WriteCommand(Command):
 
     def __repr__(self) -> str:
         return f"repr={vars(self)}"
-    
+
     def __str__(self) -> str:
         return f"Write Command; {self.__repr__()}"
 
@@ -230,7 +236,8 @@ class WriteCommand(Command):
             elif _type == WriteCommand.Type.Value8:
                 return Command.KCmdID.Write8
 
-        raise NotImplementedError(f"Unimplemented command type {_type} specified")
+        raise NotImplementedError(
+            f"Unimplemented command type {_type} specified")
 
     def write_arguments(self, io: BytesIO):
         if self.valueType == WriteCommand.Type.Pointer:
@@ -239,7 +246,7 @@ class WriteCommand(Command):
             self.value.assert_value()
 
         write_uint32(io, self.value.value)
-        
+
         if self.original is not None:
             self.original.assert_not_relative()
             write_uint32(io, self.original.value)
@@ -276,8 +283,9 @@ class WriteCommand(Command):
             elif self.valueType == WriteCommand.Type.Pointer:
                 return f"<memory offset='0x{self.address:X8}' value='{self.value:X8}' />"
 
-        raise InvalidOperationException(f"Invalid command type {self.valueType} specified")
-    
+        raise InvalidOperationException(
+            f"Invalid command type {self.valueType} specified")
+
     def pack_gecko_codes(self) -> list:
         self.address.assert_absolute()
         if self.valueType == WriteCommand.Type.Pointer:
@@ -286,9 +294,11 @@ class WriteCommand(Command):
             self.value.assert_value()
 
         if self.original is not None:
-            raise NotImplementedError("Conditional writes not yet supported for gecko")
+            raise NotImplementedError(
+                "Conditional writes not yet supported for gecko")
         elif self.address >= 0x90000000:
-            raise NotImplementedError("MEM2 writes not yet supported for gecko")
+            raise NotImplementedError(
+                "MEM2 writes not yet supported for gecko")
 
         code = ((self.address.value & 0x1FFFFFF) << 32) | self.value.value
 
@@ -299,7 +309,8 @@ class WriteCommand(Command):
         elif self.valueType == WriteCommand.Type.Pointer:
             return list(code | (0x4000000 << 32))
 
-        raise InvalidOperationException(f"Invalid command type {self.valueType} specified")
+        raise InvalidOperationException(
+            f"Invalid command type {self.valueType} specified")
 
     def apply_to_dol(self, dol: DolFile, linker: "Linker"):
         self.address.assert_absolute()
@@ -323,7 +334,7 @@ class WriteCommand(Command):
             elif self.valueType == WriteCommand.Type.Pointer:
                 dol.seek(self.address.value)
                 shouldPatch = self.original == read_uint32(dol)
-            
+
             if not shouldPatch:
                 return
 
@@ -348,7 +359,7 @@ class RelocCommand(Command):
 
     def __repr__(self) -> str:
         return f"repr={vars(self)}"
-    
+
     def __str__(self) -> str:
         return f"Relocation Command; {self.__repr__()}"
 
@@ -370,10 +381,11 @@ class RelocCommand(Command):
             if self.is_equal_reloc_types() and not self.target.is_value():
                 delta = self.target - self.address
 
-                insn = (delta & 0x3FFFFFC) | (f.read_u32(self.address.value) & 0xFC000003)
+                insn = (delta & 0x3FFFFFC) | (
+                    f.read_u32(self.address.value) & 0xFC000003)
                 f.write_u32(self.address.value, insn.value)
                 return True
- 
+
         elif self.id == Command.KCmdID.Addr32:
             if self.target.is_absolute_addr():
                 f.write_u32(self.address.value, self.target.value)
@@ -386,7 +398,8 @@ class RelocCommand(Command):
 
         elif self.id == Command.KCmdID.Addr16Hi:
             if self.target.is_absolute_addr():
-                f.write_u16(self.address.value, (self.target.value >> 16) & 0xFFFF)
+                f.write_u16(self.address.value,
+                            (self.target.value >> 16) & 0xFFFF)
                 return True
 
         elif self.id == Command.KCmdID.Addr16Ha:
@@ -402,7 +415,6 @@ class RelocCommand(Command):
             raise NotImplementedError("Unrecognized relocation type")
 
         return False
-        
 
     def pack_riivo(self) -> str:
         raise NotImplementedError()
@@ -421,7 +433,7 @@ class RelocCommand(Command):
             insn = (delta & 0x3FFFFFC) | (read_uint32(dol) & 0xFC000003)
             dol.seek(self.address.value)
             write_uint32(dol, insn.value)
- 
+
         elif self.id == Command.KCmdID.Addr32:
             dol.seek(self.address.value)
             write_uint32(dol, self.target.value)
@@ -438,9 +450,9 @@ class RelocCommand(Command):
             aTarget = (self.target.value >> 16) & 0xFFFF
             if self.target & 0x8000 == 0x8000:
                 aTarget += 1
-                
+
             dol.seek(self.address.value)
-            write_uint16(dol, aTarget) 
+            write_uint16(dol, aTarget)
 
         else:
             raise NotImplementedError("Unrecognized relocation type")

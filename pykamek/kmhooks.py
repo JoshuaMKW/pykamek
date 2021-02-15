@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from pykamek.addressmapper import AddressMapper
 from pykamek.exceptions import InvalidDataException
-from pykamek.kmcommands import BranchCommand, WriteCommand, PatchExitCommand
+from pykamek.kmcommands import BranchCommand, PatchExitCommand, WriteCommand
 from pykamek.kmword import KWord
+
 
 class HookData(object):
     def __init__(self, _type: int, args: list):
@@ -15,6 +16,7 @@ class HookData(object):
 
     def __str__(self) -> str:
         return f"Kamek HookData packet; {self.__repr__()}"
+
 
 class KHook(object):
     def __init__(self):
@@ -57,6 +59,7 @@ class KHook(object):
         else:
             raise NotImplementedError()
 
+
 class BranchHook(KHook):
     def __init__(self, args: list, mapper: AddressMapper, isLink: bool):
         super().__init__()
@@ -68,6 +71,7 @@ class BranchHook(KHook):
         dest = self.get_any_pointer_arg(args[1], mapper)
 
         self.commands.append(BranchCommand(source, dest, isLink))
+
 
 class PatchExitHook(KHook):
     def __init__(self, args: list, mapper: AddressMapper):
@@ -82,10 +86,11 @@ class PatchExitHook(KHook):
         if not args[1].is_value() or args[1] != 0:
             self.commands.append(PatchExitCommand(function, dest))
 
+
 class WriteHook(KHook):
     def __init__(self, args: list, mapper: AddressMapper, isConditional: bool):
         super().__init__()
-        
+
         argcount = 4 if isConditional else 3
         if len(args) != argcount:
             raise InvalidDataException("Wrong arg count for WriteCommand")
